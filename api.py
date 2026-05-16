@@ -8,7 +8,7 @@ Endpoints
 ---------
 POST /evaluate          — evaluate a single session
 POST /evaluate/batch    — evaluate multiple sessions at once
-GET  /health            — check that the llama.cpp server is reachable
+GET  /health            — check that the judge backend is reachable / healthy
 
 Interactive docs: http://localhost:8000/docs
 """
@@ -69,21 +69,46 @@ class BatchRequest(BaseModel):
 @app.get("/health")
 def health():
     """
-    Check that the llama.cpp server is reachable.
-    Returns 200 if healthy, 503 if the llama.cpp server is unreachable.
+    Check that the configured judge backend is healthy.
+    For llamacpp: pings the llama.cpp server.
+    For transformers: always returns ok (model is in-process).
+    For remote: pings the remote judge server's /health endpoint.
     """
-    try:
-        resp = httpx.get(config.LLAMA_URL + "/health", timeout=5)
-        llama_ok = resp.status_code == 200
-    except Exception:
-        llama_ok = False
+    backend = config.JUDGE_BACKEND.lower()
 
-    if not llama_ok:
-        raise HTTPException(
-            status_code=503,
-            detail=f"llama.cpp server unreachable at {config.LLAMA_URL}",
-        )
-    return {"status": "ok", "llama_url": config.LLAMA_URL}
+    if backend == "llamacpp":
+        try:
+            resp = httpx.get(config.LLAMA_URL + "/health", timeout=5)
+            ok = resp.status_code == 200
+        except Exception:
+            ok = False
+        if not ok:
+            raise HTTPException(
+                status_code=503,
+                detail=f"llama.cpp server unreachable at {config.LLAMA_URL}",
+            )
+        return {"status": "ok", "backend": "llamacpp", "llama_url": config.LLAMA_URL}
+
+    elif backend == "transformers":
+        # Model is loaded in-process; if we got here it's ready.
+        return {"status": "ok", "backend": "transformers", "model": config.HF_MODEL_ID}
+
+    elif backend == "remote":
+        try:
+            resp = httpx.get(config.JUDGE_SERVER_URL + "/health", timeout=5)
+            ok = resp.status_code == 200
+            remote_info = resp.json() if ok else {}
+        except Exception:
+            ok = False
+            remote_info = {}
+        if not ok:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Remote judge server unreachable at {config.JUDGE_SERVER_URL}",
+            )
+        return {"status": "ok", "backend": "remote", "server": config.JUDGE_SERVER_URL, **remote_info}
+
+    return {"status": "ok", "backend": backend}
 
 
 @app.post("/evaluate")
