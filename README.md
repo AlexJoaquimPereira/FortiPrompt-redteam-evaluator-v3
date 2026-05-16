@@ -171,6 +171,29 @@ export MONGO_URI="mongodb://localhost:27017"  # optional — leave blank to skip
 
 ### 5 — Start the FortiPrompt API server
 
+#### Mode A: plain HF model, no llama.cpp (single machine)
+
+```bash
+JUDGE_BACKEND=transformers uvicorn api:app --host 0.0.0.0 --port 8000
+# pip install transformers torch accelerate first
+```
+
+#### Mode B:  GPU server hosts the model, other machines evaluate
+
+On the GPU machine:
+
+```bash
+JUDGE_BACKEND=transformers uvicorn judge_server:app --host 0.0.0.0 --port 8081
+```
+On each evaluation machine:
+
+```bash
+JUDGE_BACKEND=remote JUDGE_SERVER_URL=http://<gpu-machine-ip>:8081 \
+  uvicorn api:app --host 0.0.0.0 --port 8000
+```
+
+#### Mode C: original llama.cpp
+
 ```bash
 uvicorn api:app --host 0.0.0.0 --port 8000
 ```
