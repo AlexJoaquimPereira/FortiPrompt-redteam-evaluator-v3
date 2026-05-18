@@ -178,13 +178,24 @@ JUDGE_BACKEND=transformers uvicorn api:app --host 0.0.0.0 --port 8000
 # pip install transformers torch accelerate first
 ```
 
-#### Mode B:  GPU server hosts the model, other machines evaluate
+#### Mode B: original llama.cpp
+
+```bash
+uvicorn api:app --host 0.0.0.0 --port 8000
+```
+
+#### To host on other machines
 
 On the GPU machine:
 
 ```bash
 JUDGE_BACKEND=transformers uvicorn judge_server:app --host 0.0.0.0 --port 8081
 ```
+or
+```bash
+uvicorn judge_server:app --host 0.0.0.0 --port 8000
+```
+
 On each evaluation machine:
 
 ```bash
@@ -192,11 +203,7 @@ JUDGE_BACKEND=remote JUDGE_SERVER_URL=http://<gpu-machine-ip>:8081 \
   uvicorn api:app --host 0.0.0.0 --port 8000
 ```
 
-#### Mode C: original llama.cpp
 
-```bash
-uvicorn api:app --host 0.0.0.0 --port 8000
-```
 
 
 ## API Quick Reference
